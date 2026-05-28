@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'bookings',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -135,4 +136,11 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Office Booking API',
+    'DESCRIPTION': 'API для бронювання робочих місць в офісі',
+    'VERSION': '1.0.0',
 }

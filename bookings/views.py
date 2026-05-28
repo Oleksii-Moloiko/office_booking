@@ -8,8 +8,13 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from .models import Workspace, Booking
 from .serializers import WorkspaceSerializer, BookingSerializer
+from drf_spectacular.utils import extend_schema, OpenApiExample
 
 
+@extend_schema(
+    tags=['system'],
+    responses={200: {'type': 'object'}},
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def home(request):
@@ -27,6 +32,36 @@ def home(request):
     )
 
 
+@extend_schema(
+    tags=['auth'],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'username': {'type': 'string'},
+                'password': {'type': 'string'},
+            },
+            'required': ['username', 'password'],
+        }
+    },
+    responses={
+        201: {
+            'type': 'object',
+            'properties': {'token': {'type': 'string'}},
+        },
+        400: {
+            'type': 'object',
+            'properties': {'error': {'type': 'string'}},
+        },
+    },
+    examples=[
+        OpenApiExample(
+            'Register example',
+            value={'username': 'testuser', 'password': 'testpass123'},
+            request_only=True,
+        ),
+    ],
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -42,6 +77,36 @@ def register(request):
     return Response({'token': token.key}, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    tags=['auth'],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'username': {'type': 'string'},
+                'password': {'type': 'string'},
+            },
+            'required': ['username', 'password'],
+        }
+    },
+    responses={
+        200: {
+            'type': 'object',
+            'properties': {'token': {'type': 'string'}},
+        },
+        401: {
+            'type': 'object',
+            'properties': {'error': {'type': 'string'}},
+        },
+    },
+    examples=[
+        OpenApiExample(
+            'Register example',
+            value={'username': 'testuser', 'password': 'testpass123'},
+            request_only=True,
+        ),
+    ],
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -75,11 +140,20 @@ class BookingViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Booking.objects.none()
         return Booking.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: {'type': 'object', 'properties': {'status': {'type': 'string'}}},
+            400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
+        },
+    )
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel(self, request, pk=None):
         booking = self.get_object()

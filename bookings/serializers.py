@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import Room, Workspace, Booking
 
 
@@ -15,6 +16,7 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         model = Workspace
         fields = ['id', 'number', 'room', 'has_monitor', 'is_available']
 
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
     def get_is_available(self, obj):
         date = self.context.get('date')
         if not date:
