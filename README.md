@@ -22,7 +22,7 @@ REST API для бронювання робочих місць в офісі. П
 ### 1. Клонуй репозиторій
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/office-booking.git
+git clone https://github.com/Oleksii-Moloiko/office_booking.git
 cd office-booking
 ```
 
