@@ -101,7 +101,7 @@ def register(request):
     },
     examples=[
         OpenApiExample(
-            'Register example',
+            'Login example',
             value={'username': 'testuser', 'password': 'testpass123'},
             request_only=True,
         ),
