@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 from .models import Room, Workspace, Booking
+from datetime import date
 
 
 class BookingAPITests(TestCase):
@@ -26,6 +27,14 @@ class BookingAPITests(TestCase):
             password='testpass123'
         )
         self.token = Token.objects.create(user=self.user)
+
+
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            password='otherpass123',
+        )
+        self.other_token = Token.objects.create(user=self.other_user)
+
 
     # ─── РЕЄСТРАЦІЯ ────────────────────────────────
 
@@ -123,6 +132,69 @@ class BookingAPITests(TestCase):
             HTTP_AUTHORIZATION=f'Token {self.token.key}'
         )
         response = self.client.get(
-            '/api/workspaces/?date=2026-05-28',\
+            '/api/workspaces/?date=2026-05-28',
         )
         self.assertFalse(response.data[0]['is_available'])
+
+    # ─── СКАСУВАННЯ ────────────────────────────────
+
+    def test_cancel_success(self):
+        booking = Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            status='active',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post(f'/api/bookings/{booking.id}/cancel/')
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'cancelled')
+
+    def test_cancel_already_cancelled(self):
+        booking = Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            status='cancelled',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post(f'/api/bookings/{booking.id}/cancel/')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+
+    def test_cancel_other_user(self):
+        booking = Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date=date.today(),
+            status='active'
+        )
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Token {self.other_token.key}'
+        )
+
+        response = self.client.post(
+            f'/api/bookings/{booking.id}/cancel/',
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'active')
+
+
+
+
+
+
+
+
+
+
+
+
+
