@@ -1,5 +1,7 @@
 # Office Booking API
 
+![Python](https://img.shields.io/badge/Python-3.11-blue) ![Django](https://img.shields.io/badge/Django-5.0-darkgreen) ![Tests](https://img.shields.io/badge/Tests-14%20passed-brightgreen)
+
 REST API для бронювання робочих місць в офісі. Побудовано на Django + Django REST Framework.
 
 ## Можливості
@@ -27,7 +29,7 @@ REST API для бронювання робочих місць в офісі. П
 ### 1. Клонуй репозиторій
 
 ```bash
-git clone https://github.com/Oleksii-Mololiko/office_booking.git
+git clone https://github.com/Oleksii-Moloiko/office_booking.git
 cd office_booking
 ```
 

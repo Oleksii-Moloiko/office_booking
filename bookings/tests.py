@@ -186,6 +186,48 @@ class BookingAPITests(TestCase):
         booking.refresh_from_db()
         self.assertEqual(booking.status, 'active')
 
+    # ─── ФІЛЬТРАЦІЯ ────────────────────────────────
+
+    def test_filter_by_has_monitor(self):
+        # Додаємо робочі місця з та без монітора
+        workspace_no_monitor = Workspace.objects.create(
+            room=self.room,
+            number='A-02',
+            has_monitor=False
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Token {self.token.key}'
+        )
+        # Фільтруємо тільки з монітором
+        response = self.client.get(
+            '/api/workspaces/?date=2026-05-28&has_monitor=true'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertTrue(response.data[0]['has_monitor'])
+
+    def test_filter_by_room(self):
+        # Додаємо другу кімнату й робоче місце в ній
+        room2 = Room.objects.create(
+            name='Conference Room',
+            floor=2
+        )
+        workspace2 = Workspace.objects.create(
+            room=room2,
+            number='B-01',
+            has_monitor=True
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Token {self.token.key}'
+        )
+        # Фільтруємо за першою кімнатою
+        response = self.client.get(
+            f'/api/workspaces/?date=2026-05-28&room={self.room.id}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['room'], self.room.id)
+
 
 
 

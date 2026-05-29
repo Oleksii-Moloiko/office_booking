@@ -8,10 +8,12 @@ Django==5.2.14
 django-filter==25.2
 djangorestframework==3.17.1
 drf-spectacular==0.29.0
+gunicorn==26.0.0
 idna==3.16
 inflection==0.5.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+packaging==26.2
 psycopg2-binary==2.9.12
 python-decouple==3.8
 pytz==2026.2
@@ -23,4 +25,5 @@ sqlparse==0.5.5
 typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.7.0
+whitenoise==6.12.0
 zope.interface==8.5
