@@ -190,16 +190,6 @@ def login_view(request):
 
 
 class WorkspaceViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for listing and retrieving workspaces.
-    
-    Supports filtering by:
-    - has_monitor: boolean filter for workspaces with monitors
-    - room: filter by room ID
-    - date: query parameter to check availability on specific date
-    
-    Example: /api/workspaces/?date=2026-05-30&has_monitor=true
-    """
     queryset = Workspace.objects.all()
     serializer_class = WorkspaceSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -209,52 +199,25 @@ class WorkspaceViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['date'] = self.request.query_params.get('date')
+        context['time_start'] = self.request.query_params.get('time_start')
+        context['time_end'] = self.request.query_params.get('time_end')
         return context
 
 
 class BookingViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing user bookings.
-    
-    Users can:
-    - List their own bookings (GET /api/bookings/)
-    - Create new bookings (POST /api/bookings/)
-    - View booking details (GET /api/bookings/{id}/)
-    - Update their bookings (PUT /api/bookings/{id}/)
-    - Delete their bookings (DELETE /api/bookings/{id}/)
-    - Cancel active bookings (POST /api/bookings/{id}/cancel/)
-    
-    Users can only see/manage their own bookings.
-    """
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Booking.objects.none()
-        return Booking.objects.filter(user=self.request.user)
+        
+        user = self.request.user
+
+        if user.is_staff:
+            return Booking.objects.select_related('user', 'workspace').all()
+        
+        return Booking.objects.select_related('user', 'workspace').filter(user=user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
-    @extend_schema(
-        request=None,
-        responses={
-            200: {'type': 'object', 'properties': {'status': {'type': 'string'}}},
-            400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
-        },
-    )
-    @action(detail=True, methods=['post'], url_path='cancel')
-    def cancel(self, request, pk=None):
-        """Cancel an active booking. Cannot cancel already cancelled bookings."""
-        booking = self.get_object()
-
-        if booking.status == 'cancelled':
-            return Response(
-                {'error': 'Бронування вже скасовано.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        booking.status = 'cancelled'
-        booking.save()
-        return Response({'status': 'Бронювання скасовано.'})

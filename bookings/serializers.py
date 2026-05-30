@@ -28,58 +28,82 @@ class WorkspaceSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.BooleanField(allow_null=True))
     def get_is_available(self, obj):
-        """
-        Check if workspace is available on given date.
-        
-        Returns None if date not provided, True/False if available/booked.
-        """
         date = self.context.get('date')
         if not date:
             return None
+        
+        time_start = self.context.get('time_start')
+        time_end = self.context.get('time_end')
+        
+        booking_filter = {
+            'booking_date': date,
+            'status': 'active',
+        }
+
+        if time_start and time_end:
+            if time_end <= time_start:
+                raise serializers.ValidationError(
+                    {"time_end": "Час закінчення повинен бути пізніше часу початку."}
+                )
+            booking_filter['time_start__lt'] = time_end
+            booking_filter['time_end__gt'] = time_start
+
         return not obj.bookings.filter(
-            booking_date=date,
-            status='active'
+            **booking_filter,
         ).exists()
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Booking model.
-    
-    - user: read-only, automatically set to current user
-    - workspace: required workspace ID
-    - booking_date: required date in YYYY-MM-DD format
-    - status: read-only, set to 'active' by default
-    - created_at, updated_at: read-only timestamps
-    
-    Validation: Prevents overbooking (same workspace/date)
-    """
     user = serializers.PrimaryKeyRelatedField(
         read_only=True,
     )
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'workspace', 'booking_date', 'status', 'created_at', 'updated_at']
+        fields = ['id', 'user', 'workspace', 'booking_date', 'status', 'created_at', 'updated_at', 'time_start', 'time_end']
         read_only_fields = ['user', 'status', 'created_at', 'updated_at']
 
     def validate(self, data):
-        """
-        Validate booking data.
+
+        user = self.context['request'].user
+
+        if self.instance:
+            if not user.is_staff:
+                forbidden_fields = ['workspace', 'booking_date', 'time_start', 'time_end']
+                for field in forbidden_fields:
+                    if field in data and data[field] != getattr(self.instance, field):
+                        raise serializers.ValidationError(
+                            {field: "Звичайний користувач не може змінювати параметри вже створеного бронюванняю"}
+                        )
+                if data.get('status') == 'active' and self.instance.status == 'cancelled':
+                    raise serializers.ValidationError(
+                        {"status": "Не можна повторно активувати скасоване бронювання."}
+                    )
+                
+            if data.get('status') == 'cancelled':
+                return data
+            
         
-        - Check if workspace and date are not already booked
-        - Return validation error if conflict found
-        """
         workspace = data.get('workspace') or getattr(self.instance, 'workspace', None)
         booking_date = data.get('booking_date') or getattr(self.instance, 'booking_date', None)
 
-        if not workspace or not booking_date:
+        time_start = data.get('time_start') or getattr(self.instance, 'time_start', None)
+        time_end = data.get('time_end') or getattr(self.instance, 'time_end', None)
+
+        if not workspace or not booking_date or not time_start or not time_end:
             return data
+
+        if time_end <= time_start:
+            raise serializers.ValidationError(
+                {"time_end": "Час закінчення повинен бути пізніше часу початку."}
+            )
 
         qs = Booking.objects.filter(
             workspace=workspace,
             booking_date=booking_date,
-            status='active'
+            status='active',
+            time_start__lt=time_end,
+            time_end__gt=time_start,
         )
 
         if self.instance:
