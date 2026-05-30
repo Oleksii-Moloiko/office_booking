@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 
 class Room(models.Model):
@@ -52,8 +53,22 @@ class Booking(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    time_start = models.TimeField(default='09:00') 
+    time_end = models.TimeField(default='17:00')
+
     class Meta:
-        unique_together = ['workspace', 'booking_date']
+        pass
 
     def __str__(self):
-        return f"{self.user} -> Стіл {self.workspace.number} ({self.booking_date})"
+        return f"{self.user} -> Стіл {self.workspace.number} ({self.booking_date} {self.time_start}-{self.time_end})"
+    
+    def clean(self):
+        """Валідація: час закінчення повинен бути пізніше часу початку."""
+        if self.time_end <= self.time_start:
+            raise ValidationError('Час закінчення повинен бути пізніше часу початку.')
+
+    def save(self, *args, **kwargs):
+        """Викликаємо full_clean() перед збереженням."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
