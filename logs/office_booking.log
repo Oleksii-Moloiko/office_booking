@@ -1,0 +1,32 @@
+INFO 2026-05-30 20:33:30,924 security 829 8334892672 Login success: user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:33:31,164 security 829 8334892672 Login failed for user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:33:31,289 security 829 8334892672 Login failed for nouser@test.com from 127.0.0.1
+INFO 2026-05-30 20:33:31,421 security 829 8334892672 Registration success: user@example.com
+WARNING 2026-05-30 20:33:31,422 security 829 8334892672 Registration failed for user@example.com: User already exists
+WARNING 2026-05-30 20:33:31,431 security 829 8334892672 Registration failed for : Email не може бути порожним
+WARNING 2026-05-30 20:33:31,439 security 829 8334892672 Registration failed for notanemail: Невірний формат email адреси
+INFO 2026-05-30 20:33:31,566 security 829 8334892672 Registration success: user@example.com
+INFO 2026-05-30 20:34:41,545 security 1037 8334892672 Login success: user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:34:41,792 security 1037 8334892672 Login failed for user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:34:41,918 security 1037 8334892672 Login failed for nouser@test.com from 127.0.0.1
+INFO 2026-05-30 20:34:42,046 security 1037 8334892672 Registration success: user@example.com
+WARNING 2026-05-30 20:34:42,047 security 1037 8334892672 Registration failed for user@example.com: User already exists
+WARNING 2026-05-30 20:34:42,057 security 1037 8334892672 Registration failed for : Email не може бути порожним
+WARNING 2026-05-30 20:34:42,069 security 1037 8334892672 Registration failed for notanemail: Невірний формат email адреси
+INFO 2026-05-30 20:34:42,214 security 1037 8334892672 Registration success: user@example.com
+WARNING 2026-05-30 20:34:42,224 security 1037 8334892672 Registration failed for user@test.com: Пароль має містити мінімум одну цифру (0-9)
+WARNING 2026-05-30 20:34:42,233 security 1037 8334892672 Registration failed for user@test.com: Пароль має містити мінімум один спеціальний символ (!@#$%^&* тощо)
+WARNING 2026-05-30 20:34:42,242 security 1037 8334892672 Registration failed for user@test.com: Пароль має бути мінімум 8 символів
+INFO 2026-05-30 20:34:42,370 security 1037 8334892672 Registration success: user@example.com
+INFO 2026-05-30 20:34:58,049 security 1089 8334892672 Login success: user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:34:58,290 security 1089 8334892672 Login failed for user@test.com from 127.0.0.1
+WARNING 2026-05-30 20:34:58,418 security 1089 8334892672 Login failed for nouser@test.com from 127.0.0.1
+INFO 2026-05-30 20:34:58,547 security 1089 8334892672 Registration success: user@example.com
+WARNING 2026-05-30 20:34:58,548 security 1089 8334892672 Registration failed for user@example.com: User already exists
+WARNING 2026-05-30 20:34:58,558 security 1089 8334892672 Registration failed for : Email не може бути порожним
+WARNING 2026-05-30 20:34:58,571 security 1089 8334892672 Registration failed for notanemail: Невірний формат email адреси
+INFO 2026-05-30 20:34:58,699 security 1089 8334892672 Registration success: user@example.com
+WARNING 2026-05-30 20:34:58,723 security 1089 8334892672 Registration failed for user@test.com: Пароль має містити мінімум одну цифру (0-9)
+WARNING 2026-05-30 20:34:58,732 security 1089 8334892672 Registration failed for user@test.com: Пароль має містити мінімум один спеціальний символ (!@#$%^&* тощо)
+WARNING 2026-05-30 20:34:58,741 security 1089 8334892672 Registration failed for user@test.com: Пароль має бути мінімум 8 символів
+INFO 2026-05-30 20:34:58,869 security 1089 8334892672 Registration success: user@example.com
