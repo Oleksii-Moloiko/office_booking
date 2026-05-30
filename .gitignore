@@ -29,3 +29,6 @@ htmlcov/
 
 # Generated OpenAPI export
 schema.yml
+
+
+staticfiles/

@@ -1,1 +1,1 @@
-web: gunicorn office_booking.wsgi
+web: python manage.py collectstatic --noinput && gunicorn office_booking.wsgi
