@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Контейнер для бази даних
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=office_booking_db
+      - POSTGRES_USER=booking_user
+      - POSTGRES_PASSWORD=secure_password_123
+    ports:
+      - "5432:5432"
+
+  # Контейнер для нашого Django API
+  web:
+    build: .
+    # Команда спочатку робить міграції, збирає статику, а потім запускає сервер
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-local-dev-key
+      - DB_NAME=office_booking_db
+      - DB_USER=booking_user
+      - DB_PASSWORD=secure_password_123
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
