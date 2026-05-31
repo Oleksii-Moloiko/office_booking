@@ -1,3 +1,4 @@
+import logging
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django_filters.rest_framework import DjangoFilterBackend
@@ -14,6 +15,9 @@ from .security import (
     InvalidPasswordException, InvalidEmailException, DuplicateUserException
 )
 from drf_spectacular.utils import extend_schema, OpenApiExample
+
+
+logger = logging.getLogger('bookings')
 
 
 @extend_schema(
@@ -220,4 +224,33 @@ class BookingViewSet(viewsets.ModelViewSet):
         return Booking.objects.select_related('user', 'workspace').filter(user=user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        booking = serializer.save(user=self.request.user)
+        logger.info(
+            'Booking created',
+            extra={
+                'user_id': self.request.user.id,
+                'username': self.request.user.username,
+                'workspace_id': booking.workspace.id,
+                'booking_date': str(booking.booking_date),
+            }
+        )
+    
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        booking = self.get_object()
+        if booking.status == 'cancelled':
+            logger.warning(
+                "Attempt to cancel already cancelled booking",
+                extra={'booking_id': booking.id, 'user_id': request.user.id}
+            )
+            return Response(
+                {'extra': 'Бронювання вже скасовано'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        booking.status = 'cancelled'
+        booking.save()
+        logger.info(
+            "Booking cancelled",
+            extra={'booking_id': booking.id, 'user_id': request.user.id}
+        )
+        return Response({'status': 'Бронювання скасовано.'})

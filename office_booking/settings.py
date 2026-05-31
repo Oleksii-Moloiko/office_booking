@@ -11,7 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+import dj_database_url
 from decouple import config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,28 +80,17 @@ WSGI_APPLICATION = 'office_booking.wsgi.application'
 
 # Database
 
-DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+DATABASE_URL = config('DATABASE_URL', default=None)
 
-if DB_ENGINE == 'django.db.backends.sqlite3':
+if DATABASE_URL:
     DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'office_booking_db'),
-        'USER': os.environ.get('DB_USER', 'booking_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'secure_password_123'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
 else:
     DATABASES = {
         'default': {
-            'ENGINE': DB_ENGINE,
-            'NAME': config('DB_NAME'),
-            'USER': config('DB_USER'),
-            'PASSWORD': config('DB_PASSWORD'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -169,38 +160,42 @@ SPECTACULAR_SETTINGS = {
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
         'simple': {
-            'format': '{levelname} {asctime} {message}',
-            'style': '{',
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{', 
+            'datefmt': '%H:%M:%S',
+        },
+        'json': {
+            '()': 'bookings.logging_formatter.JsonFormatter',
         },
     },
+
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'office_booking.log'),
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
+            'formatter': 'json' if not DEBUG else 'simple',
         },
     },
+
     'loggers': {
-        'office_booking': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'django': {
+        'bookings': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
+        },
+
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }

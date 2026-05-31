@@ -4,8 +4,10 @@ booking==1.0.0
 certifi==2026.5.20
 charset-normalizer==3.4.7
 DateTime==6.0
+dj-database-url==3.1.2
 Django==5.2.14
 django-filter==25.2
+django-ratelimit==4.1.0
 djangorestframework==3.17.1
 drf-spectacular==0.29.0
 gunicorn==26.0.0
@@ -27,4 +29,3 @@ uritemplate==4.2.0
 urllib3==2.7.0
 whitenoise==6.12.0
 zope.interface==8.5
-django-ratelimit==4.1.0
