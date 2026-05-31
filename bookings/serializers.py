@@ -62,6 +62,10 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'user', 'workspace', 'booking_date', 'status', 'created_at', 'updated_at', 'time_start', 'time_end']
         read_only_fields = ['user', 'status', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'time_start': {'required': True},
+            'time_end': {'required': True},
+        }
 
     def validate(self, data):
 

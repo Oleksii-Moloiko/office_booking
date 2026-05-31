@@ -189,7 +189,12 @@ class BookingAPITests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.post(
             '/api/bookings/',
-            {'workspace': self.workspace.id, 'booking_date': '2026-05-28'},
+            {
+                'workspace': self.workspace.id,
+                'booking_date': '2026-05-28',
+                'time_start': '09:00',
+                'time_end': '17:00'
+            },
             format='json'
         )
         self.assertEqual(response.status_code, 201)
@@ -201,7 +206,12 @@ class BookingAPITests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.post(
             '/api/bookings/',
-            {'workspace': self.workspace.id, 'booking_date': '2026-05-28'},
+            {
+                'workspace': self.workspace.id, 
+                'booking_date': '2026-05-28',
+                'time_start': '09:00',
+                'time_end': '17:00'
+            },
             format='json'
         )
         self.assertEqual(response.status_code, 201)
@@ -214,6 +224,8 @@ class BookingAPITests(TestCase):
         data = {
             'workspace': self.workspace.id,
             'booking_date': '2026-05-28',
+            'time_start': '09:00',
+            'time_end': '17:00',
         }
         first = self.client.post('/api/bookings/', data, format='json')
         self.assertEqual(first.status_code, 201)
@@ -228,6 +240,8 @@ class BookingAPITests(TestCase):
             user=self.user,
             workspace=self.workspace,
             booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='17:00',
             status='active'
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
