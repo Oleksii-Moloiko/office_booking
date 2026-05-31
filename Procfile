@@ -1,1 +1,1 @@
-web: python manage.py collectstatic --noinput && gunicorn office_booking.wsgi
+web: python manage.py collectstatic --noinput && gunicorn office_booking.wsgi --bind 0.0.0.0:$PORT
