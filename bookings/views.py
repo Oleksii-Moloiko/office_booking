@@ -244,7 +244,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 extra={'booking_id': booking.id, 'user_id': request.user.id}
             )
             return Response(
-                {'extra': 'Бронювання вже скасовано'},
+                {'error': 'Бронювання вже скасовано'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         booking.status = 'cancelled'
