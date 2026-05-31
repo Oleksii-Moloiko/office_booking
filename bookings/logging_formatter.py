@@ -1,7 +1,8 @@
 import json
 import logging
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
+from decimal import Decimal
 
 
 class JsonFormatter(logging.Formatter):
@@ -31,4 +32,12 @@ class JsonFormatter(logging.Formatter):
         if extra_fields:
             log_entry['extra'] = extra_fields
 
-        return json.dumps(log_entry, ensure_ascii=False)
+        return json.dumps(log_entry, ensure_ascii=False, default=self._serializer)
+    
+    @staticmethod
+    def _serializer(obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return str(obj)
