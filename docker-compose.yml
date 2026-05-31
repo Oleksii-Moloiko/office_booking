@@ -19,8 +19,8 @@ services:
     # Команда спочатку робить міграції, збирає статику, а потім запускає сервер
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
+        python manage.py collectstatic --noinput &&
+        gunicorn office_booking.wsgi --bind 0.0.0.0:8000 --workers 2"
     volumes:
       - .:/app
     ports:
@@ -28,6 +28,8 @@ services:
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-local-dev-key
+      - DATABASE_URL=postgres://booking_user:secure_password_123@db:5432/office_booking_db
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
       - DB_NAME=office_booking_db
       - DB_USER=booking_user
       - DB_PASSWORD=secure_password_123

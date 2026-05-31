@@ -20,3 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 6. Копіюємо весь код проекту в контейнер
 COPY . /app/
+
+# 7. Відкриваємо порт
+EXPOSE 8000
+
+# 8. Команда за замовчуванням
+CMD ["gunicorn", "office_booking.wsgi", "--bind", "0.0.0.0:8000", "--workers", "2"]

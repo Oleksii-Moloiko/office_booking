@@ -162,12 +162,12 @@ class BookingAPITests(TestCase):
     # ─── WORKSPACES ────────────────────────────────
 
     def test_get_workspaces_authenticated(self):
-        """Test authenticated user can list workspaces."""
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/workspaces/?date=2026-05-28')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertTrue(response.data[0]['is_available'])
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]['is_available'])
 
     def test_get_workspaces_unauthorized(self):
         """Test unauthenticated user cannot list workspaces."""
@@ -175,12 +175,12 @@ class BookingAPITests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_workspace_has_timestamps(self):
-        """Test workspace serializer includes timestamps."""
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/workspaces/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('created_at', response.data[0])
-        self.assertIn('updated_at', response.data[0])
+        results = response.data.get('results', response.data)
+        self.assertIn('created_at', results[0])
+        self.assertIn('updated_at', results[0])
 
     # ─── BOOKINGS ───────────────────────────────────
 
@@ -235,7 +235,6 @@ class BookingAPITests(TestCase):
         self.assertEqual(Booking.objects.count(), 1)
 
     def test_booking_shows_unavailable(self):
-        """Test workspace shows unavailable when booked."""
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
@@ -246,25 +245,28 @@ class BookingAPITests(TestCase):
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/workspaces/?date=2026-05-28')
-        self.assertFalse(response.data[0]['is_available'])
+        results = response.data.get('results', response.data)
+        self.assertFalse(results[0]['is_available'])
 
     def test_cancelled_booking_makes_workspace_available(self):
-        """Test cancelled booking frees up workspace."""
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
             booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='17:00',
             status='active'
         )
-        # Verify booked
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/workspaces/?date=2026-05-28')
-        self.assertFalse(response.data[0]['is_available'])
+        results = response.data.get('results', response.data)
+        self.assertFalse(results[0]['is_available'])
 
-        # Cancel and verify available
         self.client.post(f'/api/bookings/{booking.id}/cancel/')
         response = self.client.get('/api/workspaces/?date=2026-05-28')
-        self.assertTrue(response.data[0]['is_available'])
+        results = response.data.get('results', response.data)
+        self.assertTrue(results[0]['is_available'])
+
 
     # ─── CONCURRENCY & EDGE CASES ────────────────
 
@@ -280,23 +282,28 @@ class BookingAPITests(TestCase):
         self.assertIn(response.status_code, [201, 400])
 
     def test_user_sees_only_own_bookings(self):
-        """Test user can only see their own bookings."""
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
             booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='17:00',
             status='active'
         )
         Booking.objects.create(
             user=self.other_user,
             workspace=self.workspace,
             booking_date='2026-05-29',
+            time_start='09:00',
+            time_end='17:00',
             status='active'
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/bookings/')
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['user'], self.user.id)
+        self.assertEqual(response.status_code, 200)
+        results = response.data.get('results', response.data)  # Handle pagination
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['user'], self.user.id)
 
     # ─── CANCEL BOOKING ────────────────────────────
 
@@ -347,32 +354,23 @@ class BookingAPITests(TestCase):
     # ─── FILTERS ───────────────────────────────────
 
     def test_filter_by_has_monitor(self):
-        """Test filtering workspaces by monitor availability."""
-        workspace_no_monitor = Workspace.objects.create(
-            room=self.room,
-            number='A-02',
-            has_monitor=False
-        )
+        Workspace.objects.create(room=self.room, number='A-02', has_monitor=False)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get('/api/workspaces/?date=2026-05-28&has_monitor=true')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertTrue(response.data[0]['has_monitor'])
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]['has_monitor'])
 
     def test_filter_by_room(self):
-        """Test filtering workspaces by room."""
         room2 = Room.objects.create(name='Conference Room', floor=2)
-        workspace2 = Workspace.objects.create(
-            room=room2,
-            number='B-01',
-            has_monitor=True
-        )
+        Workspace.objects.create(room=room2, number='B-01', has_monitor=True)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.get(f'/api/workspaces/?date=2026-05-28&room={self.room.id}')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['room'], self.room.id)
-
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['room'], self.room.id)
 
 
 

@@ -8,8 +8,8 @@ router.register('bookings', BookingViewSet, basename='booking')
 
 urlpatterns = [
     path('', home),
-    path('api/', include(router.urls)),
+    path('api/v1/', include(router.urls)),   # ← новий версіонований URL
+    path('api/', include(router.urls)),       # ← старий URL для тестів і зворотної сумісності
     path('api/auth/register/', register),
     path('api/auth/login/', login_view),
-
 ]

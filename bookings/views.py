@@ -162,12 +162,6 @@ def register(request):
 @permission_classes([AllowAny])
 @ratelimit(key='ip', rate='5/h', method='POST', block=False)
 def login_view(request):
-    """
-    Login user with email and password.
-    
-    - Returns authentication token on success
-    - Rate limited: 5 requests per hour per IP
-    """
     username = request.data.get('username', '').strip()
     password = request.data.get('password', '')
     ip_address = get_client_ip(request)
@@ -194,7 +188,7 @@ def login_view(request):
 
 
 class WorkspaceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Workspace.objects.all()
+    queryset = Workspace.objects.all().order_by('id')
     serializer_class = WorkspaceSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -221,7 +215,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         if user.is_staff:
             return Booking.objects.select_related('user', 'workspace').all()
         
-        return Booking.objects.select_related('user', 'workspace').filter(user=user)
+        return Booking.objects.select_related('user', 'workspace').filter(user=user).order_by('-created_at')
 
     def perform_create(self, serializer):
         booking = serializer.save(user=self.request.user)
