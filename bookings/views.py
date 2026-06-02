@@ -1,13 +1,16 @@
 import logging
+from django.db import transaction
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django_ratelimit.decorators import ratelimit
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
-from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from django_ratelimit.decorators import ratelimit
+
 from .models import Workspace, Booking
 from .serializers import WorkspaceSerializer, BookingSerializer
 from .security import (
@@ -217,8 +220,31 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         return Booking.objects.select_related('user', 'workspace').filter(user=user).order_by('-created_at')
 
+    @transaction.atomic
     def perform_create(self, serializer):
+        
+        workspace = serializer.validated_data['workspace']
+        booking_date = serializer.validated_data['booking_date']
+        time_start = serializer.validated_data['time_start']
+        time_end = serializer.validated_data['time_end']
+
+        Workspace.objects.select_for_update().get(pk=workspace.pk)
+
+        conflict_exists = Booking.objects.filter(
+            workspace=workspace,
+            booking_date=booking_date,
+            status='active',
+            time_start__lt=time_end,
+            time_end__gt=time_start,
+        ).exists()
+
+        if conflict_exists:
+            raise ValidationError(
+                'Цей стіл вже заброньований на вибрану дату та час.'
+            )
+        
         booking = serializer.save(user=self.request.user)
+
         logger.info(
             'Booking created',
             extra={
