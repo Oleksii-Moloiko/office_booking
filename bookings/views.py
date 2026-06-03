@@ -12,6 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Workspace, Booking
+from .permissions import IsOwnerOrAdmin
 from .serializers import WorkspaceSerializer, BookingSerializer
 from .security import (
     PasswordValidator, EmailValidator, SecurityLogger, get_client_ip,
@@ -274,3 +275,17 @@ class BookingViewSet(viewsets.ModelViewSet):
             extra={'booking_id': booking.id, 'user_id': request.user.id}
         )
         return Response({'status': 'Бронювання скасовано.'})
+    
+    def get_permissions(self):
+        if self.action in [
+            'retrieve',
+            'update',
+            'partial_update',
+            'destroy',
+            'cancel',
+        ]:
+            return [
+                permissions.IsAuthenticated(),
+                IsOwnerOrAdmin(),
+            ]
+        return [permissions.IsAuthenticated()]

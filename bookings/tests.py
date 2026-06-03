@@ -234,6 +234,78 @@ class BookingAPITests(TestCase):
         self.assertEqual(second.status_code, 400)
         self.assertEqual(Booking.objects.count(), 1)
 
+    def test_overlapping_time_booking_not_allowed(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+        Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            time_start='10:00',
+            time_end='12:00',
+        )
+
+        response = self.client.post(
+            '/api/bookings/',
+            {
+                'workspace': self.workspace.id,
+                'booking_date': '2026-05-28',
+                'time_start': '11:00',
+                'time_end': '13:00',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_adjacent_booking_allwed(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+        Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='10:00',
+        )
+
+        response = self.client.post(
+            '/api/bookings/',
+            {
+                'workspace': self.workspace.id,
+                'booking_date': '2026-05-28',
+                'time_start': '10:00',
+                'time_end': '11:00',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_booking_inside_existing_booking_not_allowed(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+        Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='17:00',
+        )
+
+        response = self.client.post(
+            '/api/bookings/',
+            {
+                'workspace': self.workspace.id,
+                'booking_date': '2026-05-28',
+                'time_start': '12:00',
+                'time_end': '13:00',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
     def test_booking_shows_unavailable(self):
         Booking.objects.create(
             user=self.user,
@@ -304,6 +376,23 @@ class BookingAPITests(TestCase):
         results = response.data.get('results', response.data)  # Handle pagination
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['user'], self.user.id)
+
+    def test_other_user_cannot_view_booking(self):
+        booking = Booking.objects.create(
+            user=self.user,
+            workspace=self.workspace,
+            booking_date='2026-05-28',
+            time_start='09:00',
+            time_end='17:00',
+            status='active'
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_token.key}')
+
+        response = self.client.get(
+            f'/api/bookings/{booking.id}/'
+        )
+        self.assertEqual(response.status_code, 404)
 
     # ─── CANCEL BOOKING ────────────────────────────
 
