@@ -10,6 +10,7 @@
       margin: 30px auto;
       padding: 0 20px;
       background: #f5f5f5;
+      color: #222;
     }
 
     h1, h2 {
@@ -29,6 +30,8 @@
       margin: 5px 0;
       width: 100%;
       box-sizing: border-box;
+      border-radius: 6px;
+      border: 1px solid #ccc;
     }
 
     button {
@@ -36,25 +39,76 @@
       background: #222;
       color: white;
       border: none;
-      border-radius: 6px;
+      font-weight: 600;
     }
 
     button:hover {
       background: #444;
     }
 
-    pre {
-      background: #111;
-      color: #0f0;
-      padding: 15px;
-      overflow: auto;
-      border-radius: 8px;
-    }
-
     .row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
+    }
+
+    .output {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f1f1f1;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    .output.success {
+      background: #e6f7ec;
+      color: #146c2e;
+    }
+
+    .output.error {
+      background: #fdeaea;
+      color: #9f1c1c;
+    }
+
+    .item {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #fafafa;
+    }
+
+    .item p {
+      margin: 6px 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #eee;
+      margin-left: 6px;
+    }
+
+    .badge.available,
+    .badge.active {
+      background: #e6f7ec;
+      color: #146c2e;
+    }
+
+    .badge.unavailable,
+    .badge.cancelled {
+      background: #fdeaea;
+      color: #9f1c1c;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
     }
 
     @media (max-width: 700px) {
@@ -74,6 +128,7 @@
       <input id="registerUsername" placeholder="Email" />
       <input id="registerPassword" placeholder="Password" type="password" />
       <button onclick="registerUser()">Register</button>
+      <div id="registerOutput" class="output">Register result will appear here.</div>
     </div>
 
     <div class="card">
@@ -83,6 +138,7 @@
       <button onclick="loginUser()">Login</button>
       <button onclick="logoutUser()">Logout</button>
       <p><strong>Token:</strong> <span id="tokenStatus">not set</span></p>
+      <div id="loginOutput" class="output">Login result will appear here.</div>
     </div>
   </div>
 
@@ -100,6 +156,8 @@
     </select>
 
     <button onclick="loadWorkspaces()">Load workspaces</button>
+    <p class="hint">Use a future date for correct availability testing.</p>
+    <div id="workspacesOutput" class="output">Workspaces result will appear here.</div>
   </div>
 
   <div class="card">
@@ -111,22 +169,20 @@
     <input id="bookingTimeEnd" type="time" value="10:00" />
 
     <button onclick="createBooking()">Create booking</button>
+    <div id="createBookingOutput" class="output">Create booking result will appear here.</div>
   </div>
 
   <div class="card">
     <h2>My Bookings</h2>
     <button onclick="loadBookings()">Load my bookings</button>
+    <div id="bookingsOutput" class="output">Bookings result will appear here.</div>
   </div>
 
   <div class="card">
     <h2>Cancel Booking</h2>
     <input id="cancelBookingId" placeholder="Booking ID" />
     <button onclick="cancelBooking()">Cancel booking</button>
-  </div>
-
-  <div class="card">
-    <h2>Response</h2>
-    <pre id="output">Result will appear here...</pre>
+    <div id="cancelBookingOutput" class="output">Cancel booking result will appear here.</div>
   </div>
 
   <script>
@@ -151,11 +207,31 @@
       document.getElementById("tokenStatus").innerText = token ? "set" : "not set";
     }
 
-    function showResult(data) {
-      document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+    function setOutput(elementId, html, type = "") {
+      const element = document.getElementById(elementId);
+      element.innerHTML = html;
+      element.className = `output ${type}`;
     }
 
-    async function apiRequest(path, options = {}) {
+    function getResults(data) {
+      return data && data.results ? data.results : data;
+    }
+
+    function formatError(data) {
+      if (!data) return "Something went wrong.";
+      if (data.error) return data.error;
+      if (data.detail) return data.detail;
+
+      if (typeof data === "object") {
+        return Object.entries(data)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+          .join("<br>");
+      }
+
+      return String(data);
+    }
+
+    async function apiRequest(path, outputId, options = {}) {
       const token = getToken();
 
       const headers = {
@@ -167,36 +243,106 @@
         headers["Authorization"] = `Token ${token}`;
       }
 
-      const response = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        showResult({
-          status: response.status,
-          error: data
+      try {
+        const response = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          headers
         });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          setOutput(outputId, `<strong>Error ${response.status}</strong><br>${formatError(data)}`, "error");
+          return null;
+        }
+
+        return data;
+      } catch (error) {
+        setOutput(outputId, `<strong>Network error</strong><br>${error.message}`, "error");
         return null;
       }
+    }
 
-      showResult(data);
-      return data;
+    function renderWorkspaces(data) {
+      const workspaces = getResults(data);
+
+      if (!workspaces || workspaces.length === 0) {
+        setOutput("workspacesOutput", "No workspaces found.", "success");
+        return;
+      }
+
+      const html = workspaces.map(workspace => {
+        const availabilityClass = workspace.is_available ? "available" : "unavailable";
+        const availabilityText = workspace.is_available ? "Available" : "Unavailable";
+
+        return `
+          <div class="item">
+            <strong>Workspace #${workspace.id}</strong>
+            <span class="badge ${availabilityClass}">${availabilityText}</span>
+            <p><strong>Number:</strong> ${workspace.number}</p>
+            <p><strong>Room:</strong> ${workspace.room}</p>
+            <p><strong>Monitor:</strong> ${workspace.has_monitor ? "Yes" : "No"}</p>
+            <button onclick="selectWorkspace(${workspace.id})">Use this workspace</button>
+          </div>
+        `;
+      }).join("");
+
+      setOutput("workspacesOutput", html, "success");
+    }
+
+    function renderBookings(data) {
+      const bookings = getResults(data);
+
+      if (!bookings || bookings.length === 0) {
+        setOutput("bookingsOutput", "No bookings found.", "success");
+        return;
+      }
+
+      const html = bookings.map(booking => {
+        const statusClass = booking.status === "active" ? "active" : "cancelled";
+
+        return `
+          <div class="item">
+            <strong>Booking #${booking.id}</strong>
+            <span class="badge ${statusClass}">${booking.status}</span>
+            <p><strong>Workspace:</strong> ${booking.workspace}</p>
+            <p><strong>Date:</strong> ${booking.booking_date}</p>
+            <p><strong>Time:</strong> ${booking.time_start} - ${booking.time_end}</p>
+            <p><strong>User:</strong> ${booking.user}</p>
+            ${
+              booking.status === "active"
+                ? `<button onclick="selectBookingToCancel(${booking.id})">Select for cancellation</button>`
+                : ""
+            }
+          </div>
+        `;
+      }).join("");
+
+      setOutput("bookingsOutput", html, "success");
+    }
+
+    function selectWorkspace(workspaceId) {
+      document.getElementById("workspaceId").value = workspaceId;
+      setOutput("createBookingOutput", `Workspace #${workspaceId} selected. Now choose date and time.`, "success");
+    }
+
+    function selectBookingToCancel(bookingId) {
+      document.getElementById("cancelBookingId").value = bookingId;
+      setOutput("cancelBookingOutput", `Booking #${bookingId} selected for cancellation.`, "success");
     }
 
     async function registerUser() {
       const username = document.getElementById("registerUsername").value;
       const password = document.getElementById("registerPassword").value;
 
-      const data = await apiRequest("/auth/register/", {
+      const data = await apiRequest("/auth/register/", "registerOutput", {
         method: "POST",
         body: JSON.stringify({ username, password })
       });
 
       if (data && data.token) {
         setToken(data.token);
+        setOutput("registerOutput", "User registered successfully. Token saved.", "success");
       }
     }
 
@@ -204,19 +350,20 @@
       const username = document.getElementById("loginUsername").value;
       const password = document.getElementById("loginPassword").value;
 
-      const data = await apiRequest("/auth/login/", {
+      const data = await apiRequest("/auth/login/", "loginOutput", {
         method: "POST",
         body: JSON.stringify({ username, password })
       });
 
       if (data && data.token) {
         setToken(data.token);
+        setOutput("loginOutput", "Logged in successfully. Token saved.", "success");
       }
     }
 
     function logoutUser() {
       clearToken();
-      showResult({ message: "Logged out" });
+      setOutput("loginOutput", "Logged out successfully.", "success");
     }
 
     async function loadWorkspaces() {
@@ -232,7 +379,11 @@
       if (timeEnd) params.append("time_end", timeEnd);
       if (hasMonitor) params.append("has_monitor", hasMonitor);
 
-      await apiRequest(`/workspaces/?${params.toString()}`);
+      const data = await apiRequest(`/workspaces/?${params.toString()}`, "workspacesOutput");
+
+      if (data) {
+        renderWorkspaces(data);
+      }
     }
 
     async function createBooking() {
@@ -241,7 +392,7 @@
       const time_start = document.getElementById("bookingTimeStart").value;
       const time_end = document.getElementById("bookingTimeEnd").value;
 
-      await apiRequest("/bookings/", {
+      const data = await apiRequest("/bookings/", "createBookingOutput", {
         method: "POST",
         body: JSON.stringify({
           workspace,
@@ -250,21 +401,51 @@
           time_end
         })
       });
+
+      if (data) {
+        setOutput(
+          "createBookingOutput",
+          `Booking #${data.id} created successfully.<br>Date: ${data.booking_date}<br>Time: ${data.time_start} - ${data.time_end}`,
+          "success"
+        );
+      }
     }
 
     async function loadBookings() {
-      await apiRequest("/bookings/");
+      const data = await apiRequest("/bookings/", "bookingsOutput");
+
+      if (data) {
+        renderBookings(data);
+      }
     }
 
     async function cancelBooking() {
       const bookingId = document.getElementById("cancelBookingId").value;
 
-      await apiRequest(`/bookings/${bookingId}/cancel/`, {
+      const data = await apiRequest(`/bookings/${bookingId}/cancel/`, "cancelBookingOutput", {
         method: "POST"
       });
+
+      if (data) {
+        setOutput("cancelBookingOutput", `Booking #${bookingId} cancelled successfully.`, "success");
+      }
+    }
+
+    function setDefaultDates() {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const yyyy = tomorrow.getFullYear();
+      const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+      const dd = String(tomorrow.getDate()).padStart(2, "0");
+      const dateValue = `${yyyy}-${mm}-${dd}`;
+
+      document.getElementById("date").value = dateValue;
+      document.getElementById("bookingDate").value = dateValue;
     }
 
     updateTokenStatus();
+    setDefaultDates();
   </script>
 
 </body>
