@@ -1,10 +1,10 @@
 from django.test import TestCase
+from django.utils import timezone
 from django.contrib.auth.models import User
-from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 from .models import Room, Workspace, Booking
-from datetime import date
+from datetime import timedelta
 
 
 class AuthSecurityTests(TestCase):
@@ -140,6 +140,9 @@ class AuthSecurityTests(TestCase):
 class BookingAPITests(TestCase):
     """Comprehensive booking and workspace tests."""
 
+    def future_date(self, days=7):
+        return (timezone.now().date() + timedelta(days=days)).isoformat()
+
     def setUp(self):
         self.client = APIClient()
         self.room = Room.objects.create(name='Open Space', floor=1)
@@ -163,7 +166,7 @@ class BookingAPITests(TestCase):
 
     def test_get_workspaces_authenticated(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get('/api/workspaces/?date=2026-05-28')
+        response = self.client.get('/api/workspaces/?date={self.future_date()}')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
         self.assertEqual(len(results), 1)
@@ -191,7 +194,7 @@ class BookingAPITests(TestCase):
             '/api/bookings/',
             {
                 'workspace': self.workspace.id,
-                'booking_date': '2026-05-28',
+                'booking_date': self.future_date(),
                 'time_start': '09:00',
                 'time_end': '17:00'
             },
@@ -208,7 +211,7 @@ class BookingAPITests(TestCase):
             '/api/bookings/',
             {
                 'workspace': self.workspace.id, 
-                'booking_date': '2026-05-28',
+                'booking_date': self.future_date(),
                 'time_start': '09:00',
                 'time_end': '17:00'
             },
@@ -223,7 +226,7 @@ class BookingAPITests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         data = {
             'workspace': self.workspace.id,
-            'booking_date': '2026-05-28',
+            'booking_date': self.future_date(),
             'time_start': '09:00',
             'time_end': '17:00',
         }
@@ -240,7 +243,7 @@ class BookingAPITests(TestCase):
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='10:00',
             time_end='12:00',
         )
@@ -249,7 +252,7 @@ class BookingAPITests(TestCase):
             '/api/bookings/',
             {
                 'workspace': self.workspace.id,
-                'booking_date': '2026-05-28',
+                'booking_date': self.future_date(),
                 'time_start': '11:00',
                 'time_end': '13:00',
             },
@@ -258,13 +261,13 @@ class BookingAPITests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    def test_adjacent_booking_allwed(self):
+    def test_adjacent_booking_allowed(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
 
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='10:00',
         )
@@ -273,7 +276,7 @@ class BookingAPITests(TestCase):
             '/api/bookings/',
             {
                 'workspace': self.workspace.id,
-                'booking_date': '2026-05-28',
+                'booking_date': self.future_date(),
                 'time_start': '10:00',
                 'time_end': '11:00',
             },
@@ -288,7 +291,7 @@ class BookingAPITests(TestCase):
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='17:00',
         )
@@ -297,7 +300,7 @@ class BookingAPITests(TestCase):
             '/api/bookings/',
             {
                 'workspace': self.workspace.id,
-                'booking_date': '2026-05-28',
+                'booking_date': self.future_date(),
                 'time_start': '12:00',
                 'time_end': '13:00',
             },
@@ -310,13 +313,13 @@ class BookingAPITests(TestCase):
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='17:00',
             status='active'
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get('/api/workspaces/?date=2026-05-28')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         results = response.data.get('results', response.data)
         self.assertFalse(results[0]['is_available'])
 
@@ -324,18 +327,18 @@ class BookingAPITests(TestCase):
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='17:00',
             status='active'
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get('/api/workspaces/?date=2026-05-28')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         results = response.data.get('results', response.data)
         self.assertFalse(results[0]['is_available'])
 
         self.client.post(f'/api/bookings/{booking.id}/cancel/')
-        response = self.client.get('/api/workspaces/?date=2026-05-28')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         results = response.data.get('results', response.data)
         self.assertTrue(results[0]['is_available'])
 
@@ -357,7 +360,7 @@ class BookingAPITests(TestCase):
         Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='17:00',
             status='active'
@@ -365,7 +368,7 @@ class BookingAPITests(TestCase):
         Booking.objects.create(
             user=self.other_user,
             workspace=self.workspace,
-            booking_date='2026-05-29',
+            booking_date=self.future_date(days=8),
             time_start='09:00',
             time_end='17:00',
             status='active'
@@ -381,7 +384,7 @@ class BookingAPITests(TestCase):
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             time_start='09:00',
             time_end='17:00',
             status='active'
@@ -401,7 +404,7 @@ class BookingAPITests(TestCase):
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             status='active',
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
@@ -416,7 +419,7 @@ class BookingAPITests(TestCase):
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date='2026-05-28',
+            booking_date=self.future_date(),
             status='cancelled',
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
@@ -430,7 +433,7 @@ class BookingAPITests(TestCase):
         booking = Booking.objects.create(
             user=self.user,
             workspace=self.workspace,
-            booking_date=date.today(),
+            booking_date=self.future_date(),
             status='active'
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_token.key}')
@@ -445,7 +448,7 @@ class BookingAPITests(TestCase):
     def test_filter_by_has_monitor(self):
         Workspace.objects.create(room=self.room, number='A-02', has_monitor=False)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get('/api/workspaces/?date=2026-05-28&has_monitor=true')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}&has_monitor=true')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
         self.assertEqual(len(results), 1)
@@ -455,7 +458,7 @@ class BookingAPITests(TestCase):
         room2 = Room.objects.create(name='Conference Room', floor=2)
         Workspace.objects.create(room=room2, number='B-01', has_monitor=True)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get(f'/api/workspaces/?date=2026-05-28&room={self.room.id}')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}&room={self.room.id}')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
         self.assertEqual(len(results), 1)
