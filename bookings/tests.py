@@ -166,7 +166,7 @@ class BookingAPITests(TestCase):
 
     def test_get_workspaces_authenticated(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        response = self.client.get('/api/workspaces/?date={self.future_date()}')
+        response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
         self.assertEqual(len(results), 1)
