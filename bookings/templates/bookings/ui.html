@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Office Booking Test UI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+    }
+
+    h1, h2 {
+      color: #222;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    input, select, button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+      background: #222;
+      color: white;
+      border: none;
+      border-radius: 6px;
+    }
+
+    button:hover {
+      background: #444;
+    }
+
+    pre {
+      background: #111;
+      color: #0f0;
+      padding: 15px;
+      overflow: auto;
+      border-radius: 8px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 700px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Office Booking Test UI</h1>
+
+  <div class="row">
+    <div class="card">
+      <h2>Register</h2>
+      <input id="registerUsername" placeholder="Email" />
+      <input id="registerPassword" placeholder="Password" type="password" />
+      <button onclick="registerUser()">Register</button>
+    </div>
+
+    <div class="card">
+      <h2>Login</h2>
+      <input id="loginUsername" placeholder="Email" />
+      <input id="loginPassword" placeholder="Password" type="password" />
+      <button onclick="loginUser()">Login</button>
+      <button onclick="logoutUser()">Logout</button>
+      <p><strong>Token:</strong> <span id="tokenStatus">not set</span></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Find Workspaces</h2>
+
+    <input id="date" type="date" />
+    <input id="timeStart" type="time" value="09:00" />
+    <input id="timeEnd" type="time" value="10:00" />
+
+    <select id="hasMonitor">
+      <option value="">Any monitor status</option>
+      <option value="true">Has monitor</option>
+      <option value="false">No monitor</option>
+    </select>
+
+    <button onclick="loadWorkspaces()">Load workspaces</button>
+  </div>
+
+  <div class="card">
+    <h2>Create Booking</h2>
+
+    <input id="workspaceId" placeholder="Workspace ID" />
+    <input id="bookingDate" type="date" />
+    <input id="bookingTimeStart" type="time" value="09:00" />
+    <input id="bookingTimeEnd" type="time" value="10:00" />
+
+    <button onclick="createBooking()">Create booking</button>
+  </div>
+
+  <div class="card">
+    <h2>My Bookings</h2>
+    <button onclick="loadBookings()">Load my bookings</button>
+  </div>
+
+  <div class="card">
+    <h2>Cancel Booking</h2>
+    <input id="cancelBookingId" placeholder="Booking ID" />
+    <button onclick="cancelBooking()">Cancel booking</button>
+  </div>
+
+  <div class="card">
+    <h2>Response</h2>
+    <pre id="output">Result will appear here...</pre>
+  </div>
+
+  <script>
+    const API_BASE = "/api";
+
+    function getToken() {
+      return localStorage.getItem("office_booking_token");
+    }
+
+    function setToken(token) {
+      localStorage.setItem("office_booking_token", token);
+      updateTokenStatus();
+    }
+
+    function clearToken() {
+      localStorage.removeItem("office_booking_token");
+      updateTokenStatus();
+    }
+
+    function updateTokenStatus() {
+      const token = getToken();
+      document.getElementById("tokenStatus").innerText = token ? "set" : "not set";
+    }
+
+    function showResult(data) {
+      document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+    }
+
+    async function apiRequest(path, options = {}) {
+      const token = getToken();
+
+      const headers = {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      };
+
+      if (token) {
+        headers["Authorization"] = `Token ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        showResult({
+          status: response.status,
+          error: data
+        });
+        return null;
+      }
+
+      showResult(data);
+      return data;
+    }
+
+    async function registerUser() {
+      const username = document.getElementById("registerUsername").value;
+      const password = document.getElementById("registerPassword").value;
+
+      const data = await apiRequest("/auth/register/", {
+        method: "POST",
+        body: JSON.stringify({ username, password })
+      });
+
+      if (data && data.token) {
+        setToken(data.token);
+      }
+    }
+
+    async function loginUser() {
+      const username = document.getElementById("loginUsername").value;
+      const password = document.getElementById("loginPassword").value;
+
+      const data = await apiRequest("/auth/login/", {
+        method: "POST",
+        body: JSON.stringify({ username, password })
+      });
+
+      if (data && data.token) {
+        setToken(data.token);
+      }
+    }
+
+    function logoutUser() {
+      clearToken();
+      showResult({ message: "Logged out" });
+    }
+
+    async function loadWorkspaces() {
+      const date = document.getElementById("date").value;
+      const timeStart = document.getElementById("timeStart").value;
+      const timeEnd = document.getElementById("timeEnd").value;
+      const hasMonitor = document.getElementById("hasMonitor").value;
+
+      const params = new URLSearchParams();
+
+      if (date) params.append("date", date);
+      if (timeStart) params.append("time_start", timeStart);
+      if (timeEnd) params.append("time_end", timeEnd);
+      if (hasMonitor) params.append("has_monitor", hasMonitor);
+
+      await apiRequest(`/workspaces/?${params.toString()}`);
+    }
+
+    async function createBooking() {
+      const workspace = document.getElementById("workspaceId").value;
+      const booking_date = document.getElementById("bookingDate").value;
+      const time_start = document.getElementById("bookingTimeStart").value;
+      const time_end = document.getElementById("bookingTimeEnd").value;
+
+      await apiRequest("/bookings/", {
+        method: "POST",
+        body: JSON.stringify({
+          workspace,
+          booking_date,
+          time_start,
+          time_end
+        })
+      });
+    }
+
+    async function loadBookings() {
+      await apiRequest("/bookings/");
+    }
+
+    async function cancelBooking() {
+      const bookingId = document.getElementById("cancelBookingId").value;
+
+      await apiRequest(`/bookings/${bookingId}/cancel/`, {
+        method: "POST"
+      });
+    }
+
+    updateTokenStatus();
+  </script>
+
+</body>
+</html>

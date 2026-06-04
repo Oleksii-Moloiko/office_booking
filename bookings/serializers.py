@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import Room, Workspace, Booking
@@ -68,52 +69,43 @@ class BookingSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, data):
-
         user = self.context['request'].user
 
+        # ── UPDATE: перевірки для існуючого бронювання ──────────────────────
         if self.instance:
             if not user.is_staff:
                 forbidden_fields = ['workspace', 'booking_date', 'time_start', 'time_end']
                 for field in forbidden_fields:
                     if field in data and data[field] != getattr(self.instance, field):
                         raise serializers.ValidationError(
-                            {field: "Звичайний користувач не може змінювати параметри вже створеного бронюванняю"}
+                            {field: "Звичайний користувач не може змінювати параметри вже створеного бронювання."}
                         )
                 if data.get('status') == 'active' and self.instance.status == 'cancelled':
                     raise serializers.ValidationError(
                         {"status": "Не можна повторно активувати скасоване бронювання."}
                     )
-                
+
+            # При скасуванні подальша валідація полів не потрібна
             if data.get('status') == 'cancelled':
                 return data
-            
-        
-        workspace = data.get('workspace') or getattr(self.instance, 'workspace', None)
-        booking_date = data.get('booking_date') or getattr(self.instance, 'booking_date', None)
 
+        # ── FIELD VALIDATION: час та дата ────────────────────────────────────
         time_start = data.get('time_start') or getattr(self.instance, 'time_start', None)
         time_end = data.get('time_end') or getattr(self.instance, 'time_end', None)
+        booking_date = data.get('booking_date') or getattr(self.instance, 'booking_date', None)
 
-        if not workspace or not booking_date or not time_start or not time_end:
-            return data
-
-        if time_end <= time_start:
+        if time_start and time_end and time_end <= time_start:
             raise serializers.ValidationError(
                 {"time_end": "Час закінчення повинен бути пізніше часу початку."}
             )
 
-        qs = Booking.objects.filter(
-            workspace=workspace,
-            booking_date=booking_date,
-            status='active',
-            time_start__lt=time_end,
-            time_end__gt=time_start,
-        )
+        if booking_date and not self.instance and booking_date < timezone.now().date():
+            raise serializers.ValidationError(
+                {"booking_date": "Не можна бронювати минулі дати."}
+            )
 
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-
-        if qs.exists():
-            raise serializers.ValidationError("Цей стіл вже зайнятий на цю дату.")
+        # Перевірка конфліктів відсутня навмисно:
+        # вона виконується в perform_create/perform_update з select_for_update()
+        # всередині transaction.atomic, що захищає від race conditions.
 
         return data
