@@ -115,16 +115,23 @@ class DuplicateUserException(SecurityException):
 def get_client_ip(request):
     """
     Get client IP address from request.
-    
+
+    Takes the LAST value from X-Forwarded-For — this is the address
+    added by the last trusted proxy (e.g. nginx/load balancer),
+    and cannot be forged by the client.
+
+    If X-Forwarded-For is absent, falls back to REMOTE_ADDR.
+
     Args:
         request: Django HTTP request
-        
+
     Returns:
-        str: Client IP address
+        str: Client IP address (stripped)
     """
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
+        # Last entry = set by the last (trusted) proxy, not the client
+        ip = x_forwarded_for.split(',')[-1].strip()
     else:
-        ip = request.META.get('REMOTE_ADDR')
+        ip = request.META.get('REMOTE_ADDR', '')
     return ip

@@ -7,7 +7,7 @@ from django_ratelimit.decorators import ratelimit
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, permissions, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -23,6 +23,15 @@ from drf_spectacular.utils import extend_schema, OpenApiExample
 
 
 logger = logging.getLogger('bookings')
+
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
+
 
 def test_ui(request):
     return render(request, 'bookings/ui.html')
@@ -81,7 +90,7 @@ def home(request):
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@ratelimit(key='ip', rate='5/h', method='POST', block=False)
+@ratelimit(key='ip', rate='5/h', method='POST', block=True)
 def register(request):
     """
     Register a new user with email and password.
@@ -121,12 +130,12 @@ def register(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Create user
-        user = User.objects.create_user(username=username, password=password, email=username)
-        token, _ = Token.objects.get_or_create(user=user)
         
+        user = User.objects.create_user(username=username, password=password, email=username)
+        tokens = get_tokens_for_user(user)
+
         SecurityLogger.log_registration_attempt(username, True)
-        return Response({'token': token.key}, status=status.HTTP_201_CREATED)
+        return Response(tokens, status=status.HTTP_201_CREATED)
         
     except Exception as e:
         SecurityLogger.log_auth_error('REGISTRATION', str(e), ip_address)
@@ -168,7 +177,7 @@ def register(request):
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@ratelimit(key='ip', rate='5/h', method='POST', block=False)
+@ratelimit(key='ip', rate='5/h', method='POST', block=True)
 def login_view(request):
     username = request.data.get('username', '').strip()
     password = request.data.get('password', '')
@@ -183,9 +192,9 @@ def login_view(request):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        token, _ = Token.objects.get_or_create(user=user)
+        tokens = get_tokens_for_user(user)
         SecurityLogger.log_login_attempt(username, True, ip_address)
-        return Response({'token': token.key}, status=status.HTTP_200_OK)
+        return Response(tokens, status=status.HTTP_200_OK)      
         
     except Exception as e:
         SecurityLogger.log_auth_error('LOGIN', str(e), ip_address)

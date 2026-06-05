@@ -1,12 +1,14 @@
-from django.test import TestCase
+from urllib import response
+
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Room, Workspace, Booking
 from datetime import timedelta
 
-
+@override_settings(RATELIMIT_ENABLE=False)
 class AuthSecurityTests(TestCase):
     """Security tests for authentication endpoints."""
 
@@ -42,7 +44,8 @@ class AuthSecurityTests(TestCase):
             format='json'
         )
         self.assertEqual(response.status_code, 201)
-        self.assertIn('token', response.data)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
 
     # ─── PASSWORD REQUIREMENTS ─────────────────────
 
@@ -85,6 +88,22 @@ class AuthSecurityTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+    def test_token_refresh_success(self):
+        user = User.objects.create_user(
+            username='user@test.com',
+            password='SecurePass123!'
+        )
+        refresh = RefreshToken.for_user(user)
+
+        response = self.client.post(
+            '/api/auth/token/refresh/',
+            {'refresh': str(refresh)},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('access', response.data)
+
     # ─── DUPLICATE USER ────────────────────────────
 
     def test_register_duplicate_user(self):
@@ -103,6 +122,7 @@ class AuthSecurityTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('зареєстр', response.data['error'].lower())
+
 
     # ─── LOGIN TESTS ───────────────────────────────
 
@@ -134,14 +154,19 @@ class AuthSecurityTests(TestCase):
             format='json'
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn('token', response.data)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
 
-
+@override_settings(RATELIMIT_ENABLE=False)
 class BookingAPITests(TestCase):
     """Comprehensive booking and workspace tests."""
 
     def future_date(self, days=7):
         return (timezone.now().date() + timedelta(days=days)).isoformat()
+
+    def get_access_token(self, user):
+        refresh = RefreshToken.for_user(user)
+        return str(refresh.access_token)
 
     def setUp(self):
         self.client = APIClient()
@@ -155,17 +180,18 @@ class BookingAPITests(TestCase):
             username='testuser@test.com',
             password='SecurePass123!'
         )
-        self.token = Token.objects.create(user=self.user)
         self.other_user = User.objects.create_user(
             username='otheruser@test.com',
             password='SecurePass123!',
         )
-        self.other_token = Token.objects.create(user=self.other_user)
+
+        self.access_token = self.get_access_token(self.user)
+        self.other_access_token = self.get_access_token(self.other_user)
 
     # ─── WORKSPACES ────────────────────────────────
 
     def test_get_workspaces_authenticated(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
@@ -178,7 +204,7 @@ class BookingAPITests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_workspace_has_timestamps(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get('/api/workspaces/')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
@@ -189,7 +215,7 @@ class BookingAPITests(TestCase):
 
     def test_create_booking_success(self):
         """Test successful booking creation."""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(
             '/api/bookings/',
             {
@@ -206,7 +232,7 @@ class BookingAPITests(TestCase):
 
     def test_booking_has_timestamps(self):
         """Test booking includes timestamps."""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(
             '/api/bookings/',
             {
@@ -223,7 +249,7 @@ class BookingAPITests(TestCase):
 
     def test_overbooking_protection(self):
         """Test cannot book same workspace on same date twice."""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         data = {
             'workspace': self.workspace.id,
             'booking_date': self.future_date(),
@@ -238,7 +264,7 @@ class BookingAPITests(TestCase):
         self.assertEqual(Booking.objects.count(), 1)
 
     def test_overlapping_time_booking_not_allowed(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
 
         Booking.objects.create(
             user=self.user,
@@ -262,7 +288,7 @@ class BookingAPITests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_adjacent_booking_allowed(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
 
         Booking.objects.create(
             user=self.user,
@@ -286,7 +312,7 @@ class BookingAPITests(TestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_booking_inside_existing_booking_not_allowed(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
 
         Booking.objects.create(
             user=self.user,
@@ -318,7 +344,7 @@ class BookingAPITests(TestCase):
             time_end='17:00',
             status='active'
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         results = response.data.get('results', response.data)
         self.assertFalse(results[0]['is_available'])
@@ -332,7 +358,7 @@ class BookingAPITests(TestCase):
             time_end='17:00',
             status='active'
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(f'/api/workspaces/?date={self.future_date()}')
         results = response.data.get('results', response.data)
         self.assertFalse(results[0]['is_available'])
@@ -346,15 +372,18 @@ class BookingAPITests(TestCase):
     # ─── CONCURRENCY & EDGE CASES ────────────────
 
     def test_cannot_book_past_date(self):
-        """Test booking past dates is still allowed (admin responsibility)."""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(
             '/api/bookings/',
-            {'workspace': self.workspace.id, 'booking_date': '2020-01-01'},
+            {
+                'workspace': self.workspace.id,
+                'booking_date': '2020-01-01',
+                'time_start': '09:00',
+                'time_end': '17:00',
+            },
             format='json'
         )
-        # API allows it; validation is on business logic level
-        self.assertIn(response.status_code, [201, 400])
+        self.assertEqual(response.status_code, 400)
 
     def test_user_sees_only_own_bookings(self):
         Booking.objects.create(
@@ -373,7 +402,7 @@ class BookingAPITests(TestCase):
             time_end='17:00',
             status='active'
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get('/api/bookings/')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)  # Handle pagination
@@ -390,7 +419,7 @@ class BookingAPITests(TestCase):
             status='active'
         )
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.other_access_token}')
 
         response = self.client.get(
             f'/api/bookings/{booking.id}/'
@@ -407,7 +436,7 @@ class BookingAPITests(TestCase):
             booking_date=self.future_date(),
             status='active',
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(f'/api/bookings/{booking.id}/cancel/')
 
         self.assertEqual(response.status_code, 200)
@@ -422,7 +451,7 @@ class BookingAPITests(TestCase):
             booking_date=self.future_date(),
             status='cancelled',
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(f'/api/bookings/{booking.id}/cancel/')
 
         self.assertEqual(response.status_code, 400)
@@ -436,7 +465,7 @@ class BookingAPITests(TestCase):
             booking_date=self.future_date(),
             status='active'
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.other_access_token}')
         response = self.client.post(f'/api/bookings/{booking.id}/cancel/')
 
         self.assertEqual(response.status_code, 404)
@@ -447,7 +476,7 @@ class BookingAPITests(TestCase):
 
     def test_filter_by_has_monitor(self):
         Workspace.objects.create(room=self.room, number='A-02', has_monitor=False)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(f'/api/workspaces/?date={self.future_date()}&has_monitor=true')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)
@@ -457,7 +486,7 @@ class BookingAPITests(TestCase):
     def test_filter_by_room(self):
         room2 = Room.objects.create(name='Conference Room', floor=2)
         Workspace.objects.create(room=room2, number='B-01', has_monitor=True)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(f'/api/workspaces/?date={self.future_date()}&room={self.room.id}')
         self.assertEqual(response.status_code, 200)
         results = response.data.get('results', response.data)

@@ -1,4 +1,5 @@
 import logging
+from django_ratelimit.exceptions import Ratelimited
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,6 +16,24 @@ def custom_exception_handler(exc, context):
         "details": {...}  # опціонально
     }
     """
+    # django-ratelimit raises Ratelimited — DRF does not know about it,
+    # so exception_handler returns None. We handle it explicitly here.
+    if isinstance(exc, Ratelimited):
+        logger.warning(
+            'Rate limit exceeded',
+            extra={
+                'path': context['request'].path,
+                'method': context['request'].method,
+            }
+        )
+        return Response(
+            {
+                'error': 'Забагато запитів. Спробуйте пізніше.',
+                'code': 'too_many_requests',
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
     response = exception_handler(exc, context)
 
     if response is not None:

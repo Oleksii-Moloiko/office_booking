@@ -13,7 +13,7 @@ REST API для бронювання робочих місць в офісі а�
 
 Проєкт демонструє побудову production-ready backend-сервісу з:
 
-- JWT/Token Authentication
+- JWT Authentication with access and refresh tokens
 - бізнес-логікою бронювання
 - захистом від конфліктів часу
 - ролями користувачів
@@ -81,7 +81,8 @@ PostgreSQL
 ### Authentication
 
 - User Registration
-- Token Authentication
+- JWT Authentication
+- Access and Refresh Tokens
 - Password Validation
 - Rate Limiting
 
@@ -191,6 +192,99 @@ Project quality is verified through automated tests covering:
 * booking conflicts
 * validation rules
 * security checks
+
+---
+
+## Authentication
+
+The API uses JWT authentication via `djangorestframework-simplejwt`.
+
+After registration or login, the API returns two tokens:
+
+- `access` — used to authorize API requests.
+- `refresh` — used to obtain a new access token.
+
+### Register
+
+```http
+POST /api/auth/register/
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+Response:
+
+```json
+{
+  "refresh": "refresh_token_here",
+  "access": "access_token_here"
+}
+```
+
+### Login
+
+```http
+POST /api/auth/login/
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+Response:
+
+```json
+{
+  "refresh": "refresh_token_here",
+  "access": "access_token_here"
+}
+```
+
+### Authorized requests
+
+Use the access token in the Authorization header:
+
+```http
+Authorization: Bearer your_access_token_here
+```
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/api/workspaces/ \
+  -H "Authorization: Bearer your_access_token_here"
+```
+
+### Refresh access token
+
+```http
+POST /api/auth/token/refresh/
+Content-Type: application/json
+```
+
+```json
+{
+  "refresh": "your_refresh_token_here"
+}
+```
+
+Response:
+
+```json
+{
+  "access": "new_access_token_here"
+}
+```
 
 ---
 
